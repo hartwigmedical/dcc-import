@@ -51,8 +51,6 @@ public class ProjectImporter implements SourceImporter {
   /**
    * Dependencies.
    */
-  @NonNull
-  private final CGPClient cgpClient;
 
   @Override
   public ImportSource getSource() {
@@ -64,7 +62,6 @@ public class ProjectImporter implements SourceImporter {
   public void execute() {
     val watch = Stopwatch.createStarted();
 
-    log.info("Reading projects using {}...", cgpClient);
     val projects = readProjects();
 
     log.info("Writing {} projects to {}...", formatCount(projects), mongoUri);
@@ -75,7 +72,7 @@ public class ProjectImporter implements SourceImporter {
   }
 
   private Iterable<Project> readProjects() {
-    return new ProjectReader(cgpClient.details()).read();
+    return new ProjectReader().read();
   }
 
   private void writeProjects(Iterable<Project> specifiedProjects) throws IOException {
