@@ -81,7 +81,7 @@ public class ProjectImporterTest {
 
     val mongoClientUri = getLocalMongoClientUri(embeddedMongo.getPort(), MONGO_DB_NAME);
 
-    val importer = new ProjectImporter(mongoClientUri, cgpClient);
+    val importer = new ProjectImporter(mongoClientUri);
     importer.execute();
 
     assertImport(includedProjects);
