@@ -20,51 +20,93 @@ package org.icgc.dcc.imports.project.reader;
 import static org.icgc.dcc.imports.project.util.ProjectConverter.convertCgp;
 
 import java.util.List;
-
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
-import lombok.val;
-import lombok.extern.slf4j.Slf4j;
-
-import org.icgc.dcc.common.client.api.cgp.CGPClient;
-import org.icgc.dcc.common.client.api.cgp.CancerGenomeProject;
-import org.icgc.dcc.imports.project.model.Project;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+
+import org.icgc.dcc.common.client.api.cgp.CancerGenomeProject;
+import org.icgc.dcc.common.client.api.cgp.DataLevelProject;
+import org.icgc.dcc.imports.project.model.Project;
+import org.icgc.dcc.imports.project.util.ProjectConverter;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import lombok.val;
 
 @Slf4j
 @RequiredArgsConstructor
 public class ProjectReader {
 
-  @NonNull
-  private final CGPClient client;
+    private final List<String> locations = Lists.newArrayList("Bladder",
+            "Blood",
+            "Brain",
+            "Breast",
+            "Colorectal",
+            "Esophagus",
+            "Gall bladder",
+            "Head and neck",
+            "Kidney",
+            "Liver",
+            "Lung",
+            "Melanoma",
+            "Mesothelioma",
+            "Neuroendocrine",
+            "Other",
+            "Ovary",
+            "Pancreas",
+            "Prostate",
+            "Sarcoma",
+            "Skin",
+            "Stomach",
+            "Testis",
+            "Unknown primary",
+            "Uterus",
+            "Vaginal",
+            "Missing");
 
-  public Iterable<Project> read() {
-    val projects = ImmutableList.<Project> builder();
+    public Iterable<Project> read() {
+        val projects = ImmutableList.<Project>builder();
 
-    int projectNumber = 1;
-    val cgps = readCgps();
-    for (val value : cgps) {
-      val cgp = readCgp(value);
+        int projectNumber = 1;
+        val cgps = readCgps();
+        for (val value : cgps) {
+            val cgp = readCgp(value);
 
-      val cgpProjects = convertCgp(cgp);
-      for (val cgpProject : cgpProjects) {
-        log.info("[{}] Read CGP project {}", projectNumber, cgpProject.get__project_id());
-        projectNumber++;
-      }
+            val cgpProjects = convertCgp(cgp);
+            for (val cgpProject : cgpProjects) {
+                log.info("[{}] Read CGP project {}", projectNumber, cgpProject.get__project_id());
+                projectNumber++;
+            }
 
-      projects.addAll(cgpProjects);
+            projects.addAll(cgpProjects);
+        }
+
+        return projects.build();
     }
 
-    return projects.build();
-  }
+    private List<CancerGenomeProject> readCgps() {
+        return locations.stream().map(location -> {
+            final String projectName = "HMF" + "-" + location;
+            final String nid = projectName;
+            final Map<String, String> details = ImmutableMap.<String, String>of(ProjectConverter._PROJECT_ID_KEY, projectName);
+            final DataLevelProject dlp = DataLevelProject.builder().details(details).build();
+            final List<DataLevelProject> dlps = ImmutableList.of(dlp);
+            return CancerGenomeProject.builder()
+                    .name(projectName)
+                    .nid(nid)
+                    .organSystem(location)
+                    .country("Netherlands")
+                    .dlps(dlps)
+                    .details(details)
+                    .build();
+        }).collect(Collectors.toList());
+    }
 
-  private List<CancerGenomeProject> readCgps() {
-    return client.getCancerGenomeProjects();
-  }
-
-  private CancerGenomeProject readCgp(CancerGenomeProject value) {
-    return client.getCancerGenomeProject(value.getNid());
-  }
+    private CancerGenomeProject readCgp(CancerGenomeProject value) {
+        return value;
+    }
 
 }

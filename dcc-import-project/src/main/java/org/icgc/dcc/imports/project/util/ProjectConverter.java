@@ -17,22 +17,22 @@
  */
 package org.icgc.dcc.imports.project.util;
 
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static lombok.AccessLevel.PRIVATE;
+
 import static org.icgc.dcc.imports.project.util.ProjectFieldCleaner.cleanField;
+
+import static lombok.AccessLevel.PRIVATE;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 import org.icgc.dcc.common.client.api.cgp.CancerGenomeProject;
 import org.icgc.dcc.common.client.api.cgp.DataLevelProject;
 import org.icgc.dcc.imports.project.model.Project;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 
 import lombok.NoArgsConstructor;
 import lombok.val;
@@ -40,140 +40,80 @@ import lombok.val;
 @NoArgsConstructor(access = PRIVATE)
 public final class ProjectConverter {
 
-  /**
-   * Constants.
-   */
-  public static final String _PROJECT_ID_KEY = "field_dcc_project_code";
-  public static final String ALIAS_KEY = "field_dcc_project_alias";
-  public static final String PROJECT_NAME_KEY = "field_dcc_project_name";
-  public static final String TUMOR_TYPE_KEY = "field_cgp_tumor_type";
-  public static final String TUMOR_SUBTYPE_KEY = "field_cgp_tumor_subtype";
-  public static final String PRIMARY_COUNTRIES_KEY = "field_cgp_cou_pri";
-  public static final String PARTNER_COUNTRIES_KEY = "field_cgp_cou_part";
-  public static final String PUBMED_IDS_KEY = "field_pmid";
+    /**
+     * Constants.
+     */
+    public static final String _PROJECT_ID_KEY = "field_dcc_project_code";
+    public static final String ALIAS_KEY = "field_dcc_project_alias";
+    public static final String PROJECT_NAME_KEY = "field_dcc_project_name";
+    public static final String TUMOR_TYPE_KEY = "field_cgp_tumor_type";
+    public static final String TUMOR_SUBTYPE_KEY = "field_cgp_tumor_subtype";
+    public static final String PUBMED_IDS_KEY = "field_pmid";
+    private static final List<String> SEPARATORS = ImmutableList.of(",", " ", "\\n");
 
-  private static final List<String> SEPARATORS = ImmutableList.of(",", " ", "\\n");
-  private static final Map<String, String> PRIMARY_SITE_MAPPING = ImmutableMap.<String, String> builder()
-      .put("Bladder and Urinary Tract", "Bladder")
-      .put("Bone", "Bone")
-      .put("Breast", "Breast")
-      .put("Central Nervous System", "Brain")
-      .put("Cervix", "Cervix")
-      .put("Colorectal", "Colorectal")
-      .put("Esophagus", "Esophagus")
-      .put("Gall Bladder and Biliary System", "Gall Bladder")
-      .put("Head, Neck and Nasopharynx", "Head and neck")
-      .put("Hematopoietic and Lymphoid Tissues", "Blood")
-      .put("Kidney", "Kidney")
-      .put("Liver", "Liver")
-      .put("Lung", "Lung")
-      .put("Ovary", "Ovary")
-      .put("Pancreas", "Pancreas")
-      .put("Skin", "Skin")
-      .put("Stomach", "Stomach")
-      .put("Testis and Prostate", "Prostate")
-      .put("Uterus", "Uterus")
-      .put("Endocrine Tissues", "Nervous System")
-      .put("Soft Tissue", "Mesenchymal")
-      .build();
+    public static Iterable<Project> convertCgp(CancerGenomeProject cgp) {
+        val cgpDetails = cgp.getDetails();
 
-  public static Iterable<Project> convertCgp(CancerGenomeProject cgp) {
-    val cgpDetails = cgp.getDetails();
+        val projects = ImmutableList.<Project>builder();
+        for (val dlp : cgp.getDlps()) {
+            val dlpProject = convertDlp(cgp, cgpDetails, dlp);
 
-    val projects = ImmutableList.<Project> builder();
-    for (val dlp : cgp.getDlps()) {
-      val dlpProject = convertDlp(cgp, cgpDetails, dlp);
+            projects.add(dlpProject);
+        }
 
-      projects.add(dlpProject);
+        return projects.build();
     }
 
-    return projects.build();
-  }
+    private static Project convertDlp(CancerGenomeProject cgp, Map<String, String> cgpDetails, DataLevelProject dlp) {
+        val dlpDetails = dlp.getDetails();
 
-  private static Project convertDlp(CancerGenomeProject cgp, Map<String, String> cgpDetails, DataLevelProject dlp) {
-    val dlpDetails = dlp.getDetails();
-
-    return Project.builder()
-        .__project_id(dlpDetails.get(_PROJECT_ID_KEY))
-        .icgc_id(cgp.getNid())
-        .alias(dlpDetails.get(ALIAS_KEY))
-        .project_name(dlpDetails.get(PROJECT_NAME_KEY))
-        .tumour_type(cleanField(cgpDetails.get(TUMOR_TYPE_KEY)))
-        .tumour_subtype(cleanField(cgpDetails.get(TUMOR_SUBTYPE_KEY)))
-        .primary_site(convertPrimarySite(cgp, dlpDetails.get(_PROJECT_ID_KEY)))
-        .primary_countries(convertCountries(cgpDetails.get(PRIMARY_COUNTRIES_KEY)))
-        .partner_countries(convertCountries(cgpDetails.get(PARTNER_COUNTRIES_KEY)))
-        .pubmed_ids(convertPubmedIds(dlpDetails.get(PUBMED_IDS_KEY)))
-        .build();
-  }
-
-  private static String convertPrimarySite(CancerGenomeProject cgp, String projectId) {
-    try {
-      if ("RTBL-FR".equals(projectId)) {
-        return "Eye";
-      } else if ("NACA-CN".equals(projectId)) {
-        return "Nasopharynx";
-      } else if ("SARC-US".equals(projectId)) {
-        return "Mesenchymal";
-      } else {
-        val organSystem = cgp.getOrganSystem();
-        val primarySite = PRIMARY_SITE_MAPPING.get(organSystem);
-
-        checkState(primarySite != null, "Mapping not found for project id '%s' and primary site '%s'",
-            projectId, organSystem);
-
-        return primarySite;
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to convert " + cgp + " with projectId " + projectId, e);
-    }
-  }
-
-  private static List<String> convertCountries(String countries) {
-    if (isNullOrEmpty(countries)) {
-      return Collections.emptyList();
+        return Project.builder()
+                .__project_id(dlpDetails.get(_PROJECT_ID_KEY))
+                .icgc_id(cgp.getNid())
+                .alias(dlpDetails.get(ALIAS_KEY))
+                .project_name(dlpDetails.get(PROJECT_NAME_KEY))
+                .tumour_type(cleanField(cgpDetails.get(TUMOR_TYPE_KEY)))
+                .tumour_subtype(cleanField(cgpDetails.get(TUMOR_SUBTYPE_KEY)))
+                .primary_site(cgp.getOrganSystem())
+                .primary_countries(Lists.newArrayList(cgp.getCountry()))
+                .partner_countries(Lists.newArrayList())
+                .pubmed_ids(convertPubmedIds(dlpDetails.get(PUBMED_IDS_KEY)))
+                .build();
     }
 
-    val result = new ImmutableList.Builder<String>();
-    for (String countryCode : countries.split("_")) {
-      result.add(convertCountryName(countryCode));
+    private static List<String> convertPubmedIds(String ids) {
+        if (isNullOrEmpty(ids)) {
+            return Collections.emptyList();
+        }
+        if (ids.matches("^\\d+$")) {
+            return ImmutableList.of(ids);
+        }
+
+        return split(ids);
     }
 
-    return result.build();
-  }
+    private static List<String> split(String source) {
+        if (source == null) {
+            return Collections.emptyList();
+        }
 
-  private static String convertCountryName(String countryCode) {
-    // to align with the Project.json
-    if (countryCode.toLowerCase().equals("eu")) return "European Union";
+        val separator = getSeparator(source);
+        val result = new ImmutableList.Builder<String>();
+        for (String id : source.split(separator)) {
+            result.add(id);
+        }
 
-    return new Locale("", countryCode).getDisplayCountry();
-  }
-
-  private static List<String> convertPubmedIds(String ids) {
-    if (isNullOrEmpty(ids)) return Collections.emptyList();
-    if (ids.matches("^\\d+$")) return ImmutableList.of(ids);
-
-    return split(ids);
-  }
-
-  private static List<String> split(String source) {
-    if (source == null) return Collections.emptyList();
-
-    val separator = getSeparator(source);
-    val result = new ImmutableList.Builder<String>();
-    for (String id : source.split(separator)) {
-      result.add(id);
+        return result.build();
     }
 
-    return result.build();
-  }
+    private static String getSeparator(String source) {
+        for (val separator : SEPARATORS) {
+            if (source.contains(separator)) {
+                return separator;
+            }
+        }
 
-  private static String getSeparator(String source) {
-    for (val separator : SEPARATORS) {
-      if (source.contains(separator)) return separator;
+        throw new IllegalArgumentException("Invalid separator used: " + source);
     }
-
-    throw new IllegalArgumentException("Invalid separator used: " + source);
-  }
 
 }
