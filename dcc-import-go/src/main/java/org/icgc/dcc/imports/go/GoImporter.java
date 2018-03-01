@@ -96,7 +96,7 @@ public class GoImporter implements SourceImporter {
    * is provided as GAF2.0 format (http://www.geneontology.org/GO.format.gaf-2_0.shtml).
    */
   public static final URL DEFAULT_GAF_URL =
-      getUrl("http://geneontology.org/gene-associations/gene_association.goa_human.gz");
+      getUrl("http://geneontology.org/gene-associations/goa_human.gaf.gz");
 
   /**
    * Configuration.
