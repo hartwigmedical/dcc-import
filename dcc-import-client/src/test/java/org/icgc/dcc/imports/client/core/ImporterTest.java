@@ -24,7 +24,8 @@ import static org.icgc.dcc.common.core.model.ReleaseCollection.PROJECT_COLLECTIO
 import static org.icgc.dcc.imports.core.util.Importers.getLocalMongoClientUri;
 import static org.icgc.dcc.imports.core.util.Jongos.createJongo;
 
-import org.icgc.dcc.common.client.api.cgp.CGPClient;
+import com.mongodb.MongoClientURI;
+
 import org.icgc.dcc.common.core.mail.Mailer;
 import org.icgc.dcc.imports.client.ClientMain;
 import org.icgc.dcc.imports.core.model.ImportSource;
@@ -32,51 +33,46 @@ import org.jongo.Jongo;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-
-import com.mongodb.MongoClientURI;
 
 import lombok.val;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@SpringApplicationConfiguration(classes = ClientMain.class, inheritLocations = true)
+@SpringApplicationConfiguration(classes = ClientMain.class,
+                                inheritLocations = true)
 @Ignore("This is tested in ETLIntegration. This is useful for development though")
 public class ImporterTest {
 
-  @Autowired
-  CGPClient cgpClient;
+    /**
+     * Test environment.
+     */
+    private final MongoClientURI mongoUri = getLocalMongoClientUri("dcc-import");
+    private final Jongo jongo = createJongo(mongoUri);
 
-  /**
-   * Test environment.
-   */
-  private final MongoClientURI mongoUri = getLocalMongoClientUri("dcc-import");
-  private final Jongo jongo = createJongo(mongoUri);
+    @Test
+    public void testExecute() {
+        val importer = createImporter();
+        importer.execute(ImportSource.PROJECTS);
 
-  @Test
-  public void testExecute() {
-    val importer = createImporter();
-    importer.execute(ImportSource.PROJECTS);
+        assertThat(getCollectionSize(PROJECT_COLLECTION.getId())).isGreaterThan(0);
+        assertThat(getCollectionSize(GENE_COLLECTION.getId())).isGreaterThan(0);
+        assertThat(getCollectionSize(GENE_SET_COLLECTION.getId())).isGreaterThan(0);
+    }
 
-    assertThat(getCollectionSize(PROJECT_COLLECTION.getId())).isGreaterThan(0);
-    assertThat(getCollectionSize(GENE_COLLECTION.getId())).isGreaterThan(0);
-    assertThat(getCollectionSize(GENE_SET_COLLECTION.getId())).isGreaterThan(0);
-  }
+    private Importer createImporter() {
+        val userName = System.getProperty("cosmic.username");
+        val password = System.getProperty("cosmic.password");
 
-  private Importer createImporter() {
-    val userName = System.getProperty("cosmic.username");
-    val password = System.getProperty("cosmic.password");
+        return new Importer(mongoUri, createMailer(), userName, password);
+    }
 
-    return new Importer(mongoUri, createMailer(), cgpClient, userName, password);
-  }
+    private Mailer createMailer() {
+        return Mailer.builder().enabled(false).build();
+    }
 
-  private Mailer createMailer() {
-    return Mailer.builder().enabled(false).build();
-  }
-
-  private long getCollectionSize(String collectionName) {
-    return jongo.getCollection(collectionName).count();
-  }
+    private long getCollectionSize(String collectionName) {
+        return jongo.getCollection(collectionName).count();
+    }
 
 }
