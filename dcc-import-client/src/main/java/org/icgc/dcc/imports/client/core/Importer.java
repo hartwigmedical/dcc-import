@@ -71,11 +71,11 @@ public class Importer {
   @NonNull
   private final Map<ImportSource, SourceImporter> importers;
 
-  public Importer(@NonNull MongoClientURI mongoUri, @NonNull Mailer mailer, @NonNull CGPClient cgpClient,
+  public Importer(@NonNull MongoClientURI mongoUri, @NonNull Mailer mailer,
       @NonNull String cosmicUserName, @NonNull String cosmicPassword) {
     this.mongoUri = mongoUri;
     this.mailer = mailer;
-    this.importers = createImporters(cgpClient, cosmicUserName, cosmicPassword);
+    this.importers = createImporters(cosmicUserName, cosmicPassword);
   }
 
   public void execute() {
@@ -119,10 +119,10 @@ public class Importer {
     }
   }
 
-  private Map<ImportSource, SourceImporter> createImporters(CGPClient cgpClient, String cosmicUserName,
+  private Map<ImportSource, SourceImporter> createImporters(String cosmicUserName,
       String cosmicPassword) {
     val importers = ImmutableList.<SourceImporter> of(
-        new ProjectImporter(mongoUri, cgpClient),
+        new ProjectImporter(mongoUri),
         new GeneImporter(mongoUri),
         new DrugImporter(mongoUri),
         new CgcImporter(mongoUri, cosmicUserName, cosmicPassword),
