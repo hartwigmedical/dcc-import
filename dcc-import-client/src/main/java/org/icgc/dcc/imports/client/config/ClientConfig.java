@@ -17,9 +17,6 @@
  */
 package org.icgc.dcc.imports.client.config;
 
-import org.icgc.dcc.common.client.api.ICGCClient;
-import org.icgc.dcc.common.client.api.ICGCClientConfig;
-import org.icgc.dcc.common.client.api.cgp.CGPClient;
 import org.icgc.dcc.common.core.mail.Mailer;
 import org.icgc.dcc.imports.client.core.Importer;
 import org.springframework.context.annotation.Bean;
@@ -30,43 +27,21 @@ import lombok.val;
 @Configuration
 public class ClientConfig {
 
-  @Bean
-  public Mailer mailer(ClientProperties properties) {
-    val mailConfig = properties.getMail();
+    @Bean
+    public Mailer mailer(ClientProperties properties) {
+        val mailConfig = properties.getMail();
 
-    return Mailer.builder()
-        .enabled(mailConfig.isEnabled())
-        .host(mailConfig.getSmtpServer())
-        .recipient(mailConfig.getRecipients())
-        .build();
-  }
+        return Mailer.builder()
+                .enabled(mailConfig.isEnabled())
+                .host(mailConfig.getSmtpServer())
+                .recipient(mailConfig.getRecipients())
+                .build();
+    }
 
-  @Bean
-  public Importer importer(ClientProperties properties, CGPClient cgpClient, Mailer mailer) {
-    val mongoUri = properties.getImports().getMongoUri();
-    return new Importer(
-        mongoUri,
-        mailer,
-        cgpClient,
-        properties.getCosmic().getUserName(),
-        properties.getCosmic().getPassword());
-  }
-
-  @Bean
-  public CGPClient cgpClient(ClientProperties properties) {
-    val icgc = properties.getIcgc();
-
-    val config = ICGCClientConfig.builder()
-        .cgpServiceUrl(icgc.cgpUrl)
-        .consumerKey(icgc.consumerKey)
-        .consumerSecret(icgc.consumerSecret)
-        .accessToken(icgc.accessToken)
-        .accessSecret(icgc.accessSecret)
-        .requestLoggingEnabled(icgc.enableHttpLogging)
-        .strictSSLCertificates(icgc.enableStrictSSL)
-        .build();
-
-    return ICGCClient.create(config).cgp();
-  }
+    @Bean
+    public Importer importer(ClientProperties properties, Mailer mailer) {
+        val mongoUri = properties.getImports().getMongoUri();
+        return new Importer(mongoUri, mailer, properties.getCosmic().getUserName(), properties.getCosmic().getPassword());
+    }
 
 }
