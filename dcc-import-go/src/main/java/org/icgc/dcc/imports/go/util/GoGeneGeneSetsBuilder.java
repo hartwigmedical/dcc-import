@@ -28,6 +28,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+
 import org.icgc.dcc.imports.geneset.model.gene.GeneGeneSet;
 import org.icgc.dcc.imports.geneset.model.go.GoInferredTreeNode;
 import org.icgc.dcc.imports.go.model.GoAssociation;
@@ -35,102 +39,99 @@ import org.icgc.dcc.imports.go.model.GoModel;
 import org.icgc.dcc.imports.go.model.GoTerm;
 
 import lombok.NonNull;
-import lombok.val;
 import lombok.extern.slf4j.Slf4j;
-
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
+import lombok.val;
 
 @Slf4j
 public class GoGeneGeneSetsBuilder {
 
-  /**
-   * Data.
-   */
-  @NonNull
-  private final Map<String, List<GoInferredTreeNode>> inferredTrees;
+    /**
+     * Data.
+     */
+    @NonNull
+    private final Map<String, List<GoInferredTreeNode>> inferredTrees;
 
-  /**
-   * Indexed data.
-   */
-  @NonNull
-  private final Map<String, GoTerm> goIdTermsIndex;
-  @NonNull
-  private final Multimap<String, GoAssociation> uniprotIdAssociationsIndex;
-  @NonNull
-  private final Multimap<String, GoAssociation> goIdAssociationsIndex;
+    /**
+     * Indexed data.
+     */
+    @NonNull
+    private final Map<String, GoTerm> goIdTermsIndex;
+    @NonNull
+    private final Multimap<String, GoAssociation> uniprotIdAssociationsIndex;
+    @NonNull
+    private final Multimap<String, GoAssociation> goIdAssociationsIndex;
 
-  public GoGeneGeneSetsBuilder(@NonNull GoModel model) {
-    this.inferredTrees = model.getInferredTrees();
+    public GoGeneGeneSetsBuilder(@NonNull GoModel model) {
+        this.inferredTrees = model.getInferredTrees();
 
-    log.info("Indexing GO model...");
-    this.goIdTermsIndex = GoTermIndexer.indexGoId(model.getTerms());
-    this.uniprotIdAssociationsIndex = indexUniProtId(model.getAssociations());
-    this.goIdAssociationsIndex = indexGoId(model.getAssociations());
-  }
-
-  public Set<GeneGeneSet> build(@NonNull ObjectNode gene) {
-    val geneSets = Sets.<GeneGeneSet> newHashSet();
-    val geneUniprotIds = getGeneUniprotIds(gene);
-    log.debug("Uniprots IDs: {}", geneUniprotIds);
-
-    for (val uniprotId : geneUniprotIds) {
-      buildUniprotInferredGeneSets(geneSets, geneUniprotIds, uniprotId);
+        log.info("Indexing GO model...");
+        this.goIdTermsIndex = GoTermIndexer.indexGoId(model.getTerms());
+        this.uniprotIdAssociationsIndex = indexUniProtId(model.getAssociations());
+        this.goIdAssociationsIndex = indexGoId(model.getAssociations());
     }
 
-    return geneSets;
-  }
+    public Set<GeneGeneSet> build(@NonNull ObjectNode gene) {
+        val geneSets = Sets.<GeneGeneSet>newHashSet();
+        val geneUniprotIds = getGeneUniprotIds(gene);
+        log.debug("Uniprots IDs: {}", geneUniprotIds);
 
-  private void buildUniprotInferredGeneSets(Set<GeneGeneSet> geneSets, Set<String> geneUniprotIds, String uniprotId) {
-    val uniprotAssociations = uniprotIdAssociationsIndex.get(uniprotId);
-
-    for (val uniprotAssociation : uniprotAssociations) {
-      buildUniprotTermInferredGeneSets(geneSets, geneUniprotIds, uniprotAssociation.getKey().getGoId());
-    }
-  }
-
-  private void buildUniprotTermInferredGeneSets(Set<GeneGeneSet> geneSets, Set<String> geneUniprotIds,
-      String uniprotGoId) {
-    val uniprotTermInferredTree = inferredTrees.get(uniprotGoId);
-    if (uniprotTermInferredTree != null) {
-      // Walk the tree
-      for (val uniprotTermInferredTreeNode : uniprotTermInferredTree) {
-        val geneSet = buildUniprotTermInferredTreeNodeGeneSet(geneUniprotIds, uniprotTermInferredTreeNode);
-        geneSets.add(geneSet);
-      }
-    }
-
-  }
-
-  private GeneGeneSet buildUniprotTermInferredTreeNodeGeneSet(Set<String> geneUniprotIds,
-      GoInferredTreeNode uniprotTermInferredTreeNode) {
-    val uniprotTermInferredTreeTerm = goIdTermsIndex.get(uniprotTermInferredTreeNode.getId());
-    val uniprotTermInferredTreeTermAssociations = goIdAssociationsIndex.get(uniprotTermInferredTreeTerm.getId());
-
-    boolean direct = false;
-    val uniqueQualifiers = Sets.<String> newHashSet();
-    for (val uniprotTermInferredTreeTermAssociation : uniprotTermInferredTreeTermAssociations) {
-      val inferredUniprotId = uniprotTermInferredTreeTermAssociation.getKey().getUniProtId();
-      if (geneUniprotIds.contains(inferredUniprotId)) {
-        direct = true;
-        val qualifiers = uniprotTermInferredTreeTermAssociation.getQualifiers();
-
-        if (qualifiers == null || qualifiers.isEmpty()) {
-          uniqueQualifiers.add(null);
-        } else {
-          uniqueQualifiers.addAll(qualifiers);
+        for (val uniprotId : geneUniprotIds) {
+            buildUniprotInferredGeneSets(geneSets, geneUniprotIds, uniprotId);
         }
-      }
+
+        return geneSets;
     }
 
-    return GeneGeneSet.builder()
-        .id(uniprotTermInferredTreeTerm.getId())
-        .name(uniprotTermInferredTreeTerm.getName())
-        .type(GO_TERM)
-        .annotation(direct ? DIRECT : INFERRED)
-        .qualifiers(direct ? uniqueQualifiers : null)
-        .build();
-  }
+    private void buildUniprotInferredGeneSets(Set<GeneGeneSet> geneSets, Set<String> geneUniprotIds, String uniprotId) {
+        val uniprotAssociations = uniprotIdAssociationsIndex.get(uniprotId);
+
+        for (val uniprotAssociation : uniprotAssociations) {
+            buildUniprotTermInferredGeneSets(geneSets, geneUniprotIds, uniprotAssociation.getKey().getGoId());
+        }
+    }
+
+    private void buildUniprotTermInferredGeneSets(Set<GeneGeneSet> geneSets, Set<String> geneUniprotIds, String uniprotGoId) {
+        val uniprotTermInferredTree = inferredTrees.get(uniprotGoId);
+        if (uniprotTermInferredTree != null) {
+            // Walk the tree
+            for (val uniprotTermInferredTreeNode : uniprotTermInferredTree) {
+                val uniprotTermInferredTreeTerm = goIdTermsIndex.get(uniprotTermInferredTreeNode.getId());
+                if (uniprotTermInferredTreeTerm == null) {
+                    log.error("uniprotTermInferredTreeTerm for Inferred tree node {} was null, proceed with caution",
+                            uniprotTermInferredTreeNode.getId());
+                } else {
+                    val geneSet = buildUniprotTermInferredTreeNodeGeneSet(geneUniprotIds, uniprotTermInferredTreeTerm);
+                    geneSets.add(geneSet);
+                }
+            }
+        }
+    }
+
+    private GeneGeneSet buildUniprotTermInferredTreeNodeGeneSet(Set<String> geneUniprotIds, GoTerm uniprotTermInferredTreeTerm) {
+        val uniprotTermInferredTreeTermAssociations = goIdAssociationsIndex.get(uniprotTermInferredTreeTerm.getId());
+        boolean direct = false;
+        val uniqueQualifiers = Sets.<String>newHashSet();
+        for (val uniprotTermInferredTreeTermAssociation : uniprotTermInferredTreeTermAssociations) {
+            val inferredUniprotId = uniprotTermInferredTreeTermAssociation.getKey().getUniProtId();
+            if (geneUniprotIds.contains(inferredUniprotId)) {
+                direct = true;
+                val qualifiers = uniprotTermInferredTreeTermAssociation.getQualifiers();
+
+                if (qualifiers == null || qualifiers.isEmpty()) {
+                    uniqueQualifiers.add(null);
+                } else {
+                    uniqueQualifiers.addAll(qualifiers);
+                }
+            }
+        }
+
+        return GeneGeneSet.builder()
+                .id(uniprotTermInferredTreeTerm.getId())
+                .name(uniprotTermInferredTreeTerm.getName())
+                .type(GO_TERM)
+                .annotation(direct ? DIRECT : INFERRED)
+                .qualifiers(direct ? uniqueQualifiers : null)
+                .build();
+    }
 
 }
