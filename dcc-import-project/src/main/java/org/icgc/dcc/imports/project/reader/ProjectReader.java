@@ -54,7 +54,6 @@ public class ProjectReader {
             "Melanoma",
             "Mesothelioma",
             "Neuroendocrine",
-            "Other",
             "Ovary",
             "Pancreas",
             "Prostate",
@@ -62,10 +61,8 @@ public class ProjectReader {
             "Skin",
             "Stomach",
             "Testis",
-            "Unknown primary",
             "Uterus",
-            "Vaginal",
-            "Missing");
+            "Vaginal");
 
     public Iterable<Project> read() {
         val projects = ImmutableList.<Project>builder();
