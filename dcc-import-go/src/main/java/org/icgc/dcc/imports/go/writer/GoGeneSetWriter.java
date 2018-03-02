@@ -20,10 +20,8 @@ package org.icgc.dcc.imports.go.writer;
 import static org.icgc.dcc.imports.geneset.model.GeneSetType.GO_TERM;
 
 import java.util.List;
-
-import lombok.NonNull;
-import lombok.val;
-import lombok.extern.slf4j.Slf4j;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.icgc.dcc.imports.geneset.model.GeneSet;
 import org.icgc.dcc.imports.geneset.model.GeneSetGoTerm;
@@ -33,45 +31,53 @@ import org.icgc.dcc.imports.go.model.GoModel;
 import org.icgc.dcc.imports.go.model.GoTerm;
 import org.jongo.MongoCollection;
 
+import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+
 @Slf4j
 public class GoGeneSetWriter extends AbstractGeneSetWriter {
 
-  /**
-   * Constants.
-   */
-  private static final String GENE_ONTOLOGY_SOURCE = "Gene Ontology";
+    /**
+     * Constants.
+     */
+    private static final String GENE_ONTOLOGY_SOURCE = "Gene Ontology";
 
-  public GoGeneSetWriter(@NonNull MongoCollection geneSetCollection) {
-    super(geneSetCollection);
-  }
-
-  public void write(@NonNull GoModel model) {
-    log.info("Clearing term gene set documents...");
-    clearGeneSets(GO_TERM);
-
-    log.info("Writing term gene set documents...");
-    for (val term : model.getTerms()) {
-      val inferredTree = model.getInferredTree(term.getId());
-      val geneSet = createGeneSet(term, inferredTree);
-
-      saveGeneSet(geneSet);
+    public GoGeneSetWriter(@NonNull MongoCollection geneSetCollection) {
+        super(geneSetCollection);
     }
-  }
 
-  private GeneSet createGeneSet(GoTerm term, List<GoInferredTreeNode> inferredTree) {
-    return GeneSet.builder()
-        .id(term.getId())
-        .type(GO_TERM)
-        .source(GENE_ONTOLOGY_SOURCE)
-        .name(term.getName())
-        .description(term.getDef())
-        .goTerm(GeneSetGoTerm.builder()
-            .ontology(term.getNamespace())
-            .altIds(term.getAltIds())
-            .synonyms(term.getSynonym())
-            .inferredTree(inferredTree)
-            .build())
-        .build();
-  }
+    public void write(@NonNull GoModel model) {
+        log.info("Clearing term gene set documents...");
+        clearGeneSets(GO_TERM);
+
+        log.info("Writing term gene set documents...");
+        for (val term : model.getTerms()) {
+            val inferredTree = model.getInferredTree(term.getId());
+            if (inferredTree == null) {
+                val alts = StreamSupport.stream(term.getAltIds().spliterator(), false).collect(Collectors.joining(","));
+                log.error("Inferred tree for term {} with alts [{}] was null, proceed with caution", term.getId(), alts);
+            } else {
+                val geneSet = createGeneSet(term, inferredTree);
+                saveGeneSet(geneSet);
+            }
+        }
+    }
+
+    private GeneSet createGeneSet(GoTerm term, List<GoInferredTreeNode> inferredTree) {
+        return GeneSet.builder()
+                .id(term.getId())
+                .type(GO_TERM)
+                .source(GENE_ONTOLOGY_SOURCE)
+                .name(term.getName())
+                .description(term.getDef())
+                .goTerm(GeneSetGoTerm.builder()
+                        .ontology(term.getNamespace())
+                        .altIds(term.getAltIds())
+                        .synonyms(term.getSynonym())
+                        .inferredTree(inferredTree)
+                        .build())
+                .build();
+    }
 
 }
